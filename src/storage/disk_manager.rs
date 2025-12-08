@@ -2,6 +2,8 @@ use core::num;
 use std::io::{Read, Seek, Write};
 
 use crate::{PAGE_SIZE, StorageError,Page};
+use crate::storage::MetaPage;
+
 
 pub struct DiskManager{
     file: std::fs::File,
@@ -46,14 +48,32 @@ impl DiskManager {
 
     }
 
-    pub fn write_page(&mut self, page: &Page) -> Result<(), StorageError> {
+    pub fn write_page(&mut self, page: &mut Page) -> Result<(), StorageError> {
         let offset = (page.id as u64) * (PAGE_SIZE as u64);
         self.file.seek(std::io::SeekFrom::Start(offset))?;
         self.file.write(&page.data)?;
         self.num_pages += 1;
-
-
         Ok(())
+    }
+
+    pub fn allocate_page(&mut self)-> Result<Page,StorageError>{
+        let offset = self.num_pages as u64 * PAGE_SIZE as u64;
+        let page = Page::new(self.num_pages as u64);
+        self.file.seek(std::io::SeekFrom::Start(offset))?;
+        self.file.write_all(&page.data)?;
+        self.num_pages += 1;
+        return Ok(page);
+    }
+
+    pub fn load_meta_page(&mut self) -> Result<MetaPage,StorageError>{
+        let meta_page = self.read_page(0)?;
+        MetaPage::from_bytes(&meta_page)
+    }
+
+    pub  fn save_meta_page(&mut self,meta_page: &MetaPage) -> Result<(),StorageError>{
+        let mut page = Page::new(0);
+        meta_page.to_bytes(&mut page)?;
+        self.write_page(&mut page)
     }
 }
 
